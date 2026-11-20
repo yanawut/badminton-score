@@ -128,6 +128,7 @@ body.cam .badge{top:0;margin-top:clamp(66px,15vw,170px)}
 body.cam .half.top .chip{align-self:flex-end;margin:0 0 8px;opacity:.85}
 body.cam .half.bot .chip{opacity:.85}
 body.calib #ovc{pointer-events:auto;z-index:20;touch-action:none}
+#camFlip{position:fixed;right:calc(22px + env(safe-area-inset-right));top:calc(70px + env(safe-area-inset-top));z-index:30;width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.3);font-size:22px}
 #camPill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:30;background:rgba(0,0,0,.7);padding:6px 14px;border-radius:999px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
 #camPill i{width:9px;height:9px;border-radius:50%;background:#777;display:inline-block}
 #camPill.ready i{background:#2fae64}#camPill.track i{background:#ffc21a;box-shadow:0 0 10px #ffc21a}#camPill.cool i{background:#777}
@@ -258,6 +259,7 @@ body.calib #ovc{pointer-events:auto;z-index:20;touch-action:none}
   </footer>
 </section>
 
+<button id="camFlip" class="hidden" aria-label="สลับกล้องหน้า/หลัง">🔄</button>
 <div id="camPill" class="hidden"><i></i><span id="camPillT">กล้อง</span></div>
 <div id="camBar" class="hidden"></div>
 <div id="calibBox" class="hidden">
@@ -583,9 +585,9 @@ document.addEventListener('visibilitychange', () => { if(document.visibilityStat
    point to the opposite side when the shuttle stops below the floor line
    ===================================================================== */
 const CKEY = 'badminton-cam.v1';
-const C = { on:false, stream:null, calib:false, debug:false, auto:true, sens:1, netX:.5, floorY:.72, hasCalib:false };
+const C = { on:false, stream:null, calib:false, debug:false, auto:true, sens:1, netX:.5, floorY:.72, hasCalib:false, facing:'environment' };
 try{ Object.assign(C, JSON.parse(localStorage.getItem(CKEY)||'{}'), {on:false, stream:null, calib:false}); }catch(e){}
-const saveCam = () => { try{ localStorage.setItem(CKEY, JSON.stringify({debug:C.debug, auto:C.auto, sens:C.sens, netX:C.netX, floorY:C.floorY, hasCalib:C.hasCalib})); }catch(e){} };
+const saveCam = () => { try{ localStorage.setItem(CKEY, JSON.stringify({facing:C.facing, debug:C.debug, auto:C.auto, sens:C.sens, netX:C.netX, floorY:C.floorY, hasCalib:C.hasCalib})); }catch(e){} };
 const SENS = [ {label:'ต่ำ', thr:38, minA:3}, {label:'กลาง', thr:26, minA:2}, {label:'สูง', thr:16, minA:1} ];
 
 const vid = $('#vid'), ovc = $('#ovc'), octx = ovc.getContext('2d');
@@ -602,7 +604,7 @@ async function camStart(){
     $('#cOk').onclick = closeOv; return;
   }
   try{
-    C.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:60} } });
+    C.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ideal:C.facing}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:60} } });
   }catch(e){
     openOv(`<h3>ไม่ได้รับสิทธิ์กล้อง</h3><p>กรุณาอนุญาตการใช้กล้องในการตั้งค่าเบราว์เซอร์ แล้วลองใหม่<br><small>${esc(e.name||'')}</small></p><div class="btns"><button class="pri" id="cOk">ตกลง</button></div>`);
     $('#cOk').onclick = closeOv; return;
@@ -610,16 +612,39 @@ async function camStart(){
   vid.srcObject = C.stream;
   try{ await vid.play(); }catch(e){}
   C.on = true; document.body.classList.add('cam');
-  $('#camPill').classList.remove('hidden');
+  $('#camPill').classList.remove('hidden'); syncCamBtn();
   prevGray = null; track = null; lastAward = Date.now();
   loop();
   if(!C.hasCalib) startCalib(); else toast('กล้องพร้อม · ให้แต้ม' + (C.auto ? 'อัตโนมัติ' : 'แบบถามก่อน'));
 }
+async function camSwitch(){
+  if(!C.on) return;
+  const prevFacing = C.facing; let noOther = false;
+  C.facing = C.facing === 'environment' ? 'user' : 'environment';
+  try{ C.stream && C.stream.getTracks().forEach(t => t.stop()); }catch(e){}
+  try{
+    C.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{exact:C.facing}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:60} } });
+  }catch(e){
+    // device has only one camera on that side: go back to the previous one
+    C.facing = prevFacing;
+    try{ C.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ideal:C.facing}, width:{ideal:1280}, height:{ideal:720} } }); }
+    catch(e2){ camStop(); toast('เปิดกล้องไม่ได้'); return; }
+    noOther = true;
+  }
+  vid.srcObject = C.stream;
+  try{ await vid.play(); }catch(e){}
+  prevGray = null; track = null; lastAward = Date.now(); hidePending();
+  saveCam(); syncCamBtn();
+  toast(noOther ? 'เครื่องนี้ไม่มีกล้อง' + (C.facing==='environment' ? 'หน้า' : 'หลัง')
+                : 'ใช้กล้อง' + (C.facing==='environment' ? 'หลัง' : 'หน้า'));
+}
+function syncCamBtn(){ const b = $('#camFlip'); if(b) b.classList.toggle('hidden', !C.on); }
+
 function camStop(){
   try{ C.stream && C.stream.getTracks().forEach(t => t.stop()); }catch(e){}
   C.stream = null; C.on = false; vid.srcObject = null;
   document.body.classList.remove('cam','calib');
-  $('#camPill').classList.add('hidden'); $('#calibBox').classList.add('hidden'); hidePending();
+  $('#camPill').classList.add('hidden'); syncCamBtn(); $('#calibBox').classList.add('hidden'); hidePending();
   if(loopId) cancelAnimationFrame(loopId); loopId = null;
   octx.clearRect(0,0,ovc.width,ovc.height);
 }
@@ -867,6 +892,7 @@ function moveLine(e){
 function camMenu(){
   openOv(`<div class="menu"><h3>โหมดกล้อง</h3>
     <div class="btns">
+      <button id="cFace">สลับกล้อง <span>${C.facing==='environment'?'กล้องหลัง':'กล้องหน้า'} 🔄</span></button>
       <button id="cAuto">ให้แต้มอัตโนมัติ <span class="sw ${C.auto?'on':''}"></span></button>
       <button id="cSens">ความไวการจับลูก <span>${SENS[C.sens].label}</span></button>
       <button id="cCal">ตั้งเส้นเน็ต / พื้น <span>📐</span></button>
@@ -875,6 +901,7 @@ function camMenu(){
       <button class="pri" id="cClose" style="text-align:center;justify-content:center">ปิด</button>
     </div>
     <p style="margin-top:12px;font-size:12.5px;text-align:left">ระบบดูว่าลูกตกพื้นฝั่งไหนแล้วให้แต้มอีกฝั่ง ยังแยกลูกออกหรือลูกเสียที่ไม่ตกพื้น (ติดเน็ต, ฟาล์ว) ไม่ได้ — แตะฝั่งที่ได้แต้มเองหรือกด "ไม่ใช่" ได้ตลอด</p></div>`);
+  $('#cFace').onclick = async () => { closeOv(); await camSwitch(); };
   $('#cAuto').onclick = () => { C.auto = !C.auto; saveCam(); camMenu(); };
   $('#cSens').onclick = () => { C.sens = (C.sens+1) % SENS.length; saveCam(); camMenu(); };
   $('#cCal').onclick = () => { closeOv(); startCalib(); };
@@ -882,6 +909,7 @@ function camMenu(){
   $('#cOff').onclick = () => { closeOv(); camStop(); };
   $('#cClose').onclick = closeOv;
 }
+$('#camFlip').onclick = camSwitch;
 $('#btnCam').onclick = () => C.on ? camMenu() : camStart();
 // manual taps/undo during a pending award cancel it
 ['#pL','#pR','#btnUndo'].forEach(s => $(s).addEventListener('click', () => { if(pending){ hidePending(); lastAward = Date.now(); } }, true));
