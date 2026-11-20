@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>นับแต้มแบดมินตัน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;600;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07110c; --court:#0f3b25; --court2:#0c321f; --line:rgba(255,255,255,.85);
+  --ink:#f3f7f4; --mute:#93a89b; --A:#ffc21a; --B:#3ec5ff; --danger:#ff5d5d;
+  --num:'Oswald',sans-serif; --th:'Anuphan',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--ink);font-family:var(--th);overflow:hidden}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+.hidden{display:none!important}
+
+/* ---------- setup ---------- */
+#setup{height:100%;overflow:auto;padding:24px 18px 40px}
+.wrap{max-width:520px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.brand svg{flex:none}
+.brand h1{font-size:24px;font-weight:700;line-height:1.1}
+.brand p{color:var(--mute);font-size:13px;margin-top:2px}
+.card{background:#0e1c15;border:1px solid #1d3327;border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;font-weight:600;color:var(--mute);letter-spacing:.04em;margin-bottom:10px}
+.seg{display:flex;background:#08130d;border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;padding:10px 6px;border-radius:9px;font-size:15px;font-weight:600;color:var(--mute)}
+.seg button.on{background:#1f5c3a;color:#fff}
+.team{display:grid;gap:8px}
+.team label{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%}
+input[type=text]{width:100%;background:#08130d;border:1px solid #1f3a2b;border-radius:10px;padding:12px;font-size:16px;color:var(--ink);font-family:inherit}
+input[type=text]:focus{outline:2px solid #2f8a57;border-color:transparent}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toggle{display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.toggle span small{display:block;color:var(--mute);font-size:12px}
+.sw{width:50px;height:30px;border-radius:15px;background:#29392f;position:relative;transition:.2s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:#2fae64}.sw.on::after{left:23px}
+.big{width:100%;padding:16px;border-radius:14px;font-size:18px;font-weight:700;background:#2fae64;color:#04140a;margin-top:6px}
+.ghost{width:100%;padding:14px;border-radius:14px;font-size:16px;font-weight:600;background:#13261b;border:1px solid #24412f;margin-top:10px}
+.rules{color:var(--mute);font-size:12.5px;line-height:1.7;margin-top:14px}
+
+/* ---------- game ---------- */
+#game{height:100%;display:flex;flex-direction:column}
+header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:8px 12px;gap:8px;min-height:58px}
+.hteam{display:flex;align-items:center;gap:8px;min-width:0}
+.hteam.r{justify-content:flex-end;text-align:right}
+.hteam .nm{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gw{font-family:var(--num);font-size:26px;font-weight:700;min-width:22px;text-align:center}
+.hmid{text-align:center}
+.hmid .g{font-weight:700;font-size:14px}
+.hmid .prev{font-family:var(--num);color:var(--mute);font-size:12px;letter-spacing:.03em}
+
+main{flex:1;display:flex;padding:0 10px;gap:0;min-height:0;position:relative}
+.panel{flex:1;position:relative;background:var(--court);border:3px solid var(--line);display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer;transition:background .15s}
+.panel.L{border-right:none;border-radius:14px 0 0 14px}
+.panel.R{border-left:none;border-radius:0 14px 14px 0}
+.panel:active{background:var(--court2)}
+.panel .half{flex:1;display:flex;align-items:center;justify-content:center;position:relative}
+.panel .half.top{border-bottom:2px solid rgba(255,255,255,.35)}
+.panel.flash{animation:fl .35s}
+@keyframes fl{0%{box-shadow:inset 0 0 0 999px rgba(255,255,255,.18)}100%{box-shadow:inset 0 0 0 999px rgba(255,255,255,0)}}
+.net{width:6px;background:repeating-linear-gradient(0deg,#fff 0 3px,transparent 3px 7px);position:relative;z-index:2}
+.score{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1}
+.score b{font-family:var(--num);font-weight:700;font-size:clamp(88px,26vw,300px);line-height:1;text-shadow:0 6px 30px rgba(0,0,0,.45)}
+.panel.tA .score b{color:var(--A)}.panel.tB .score b{color:var(--B)}
+.chip{position:relative;z-index:3;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(0,0,0,.45);font-size:14px;font-weight:600;max-width:92%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(4px)}
+.half.top .chip{align-self:flex-start;margin-top:10px}
+.half.bot .chip{align-self:flex-end;margin-bottom:10px}
+.chip.srv{background:#fff;color:#06140c}
+.chip.rcv{outline:2px dashed rgba(255,255,255,.7)}
+.chip .ic{font-size:15px}
+.badge{position:absolute;left:50%;transform:translateX(-50%);top:50%;margin-top:clamp(52px,15vw,170px);z-index:3;font-family:var(--num);font-size:14px;letter-spacing:.12em;padding:4px 10px;border-radius:6px;background:var(--danger);color:#fff;white-space:nowrap}
+.badge.gp{background:#ff9f1a;color:#1a0d00}
+.swapP{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:4;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.5);font-size:18px}
+.panel.R .swapP{right:auto;left:8px}
+
+.status{text-align:center;padding:8px 12px 2px;font-size:14px;color:var(--mute);min-height:30px}
+.status strong{color:var(--ink)}
+footer{display:flex;gap:10px;padding:8px 12px 12px}
+footer button{flex:1;padding:14px 8px;border-radius:14px;background:#12241a;border:1px solid #22402f;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+footer button:disabled{opacity:.35}
+footer .ico{font-size:18px}
+
+/* ---------- overlays ---------- */
+.ov{position:fixed;inset:0;background:rgba(3,8,5,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.box{background:#0f1e16;border:1px solid #24412f;border-radius:20px;padding:24px;width:100%;max-width:420px;text-align:center}
+.box h3{font-size:22px;margin-bottom:6px}
+.box p{color:var(--mute);font-size:14px;line-height:1.6}
+.timer{font-family:var(--num);font-size:84px;font-weight:700;margin:10px 0 4px}
+.timer.warn{color:var(--danger)}
+.box .btns{display:grid;gap:8px;margin-top:18px}
+.box .btns button{padding:14px;border-radius:12px;font-size:16px;font-weight:700;background:#1c3a29}
+.box .btns button.pri{background:#2fae64;color:#04140a}
+.box .btns button.dng{background:#4a1717;color:#ffd6d6}
+.trophy{font-size:56px}
+.res{margin:14px 0;display:grid;gap:6px}
+.res div{display:flex;justify-content:space-between;background:#0a1610;border-radius:10px;padding:10px 14px;font-family:var(--num);font-size:18px}
+.res div span:first-child{font-family:var(--th);font-size:14px;color:var(--mute)}
+.menu .btns button{text-align:left;padding:14px 16px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#fff;color:#06140c;padding:10px 18px;border-radius:999px;font-weight:700;font-size:15px;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:opacity .3s}
+
+/* ---------- camera mode ---------- */
+#vid,#ovc{position:absolute;top:0;bottom:0;left:10px;right:10px;width:calc(100% - 20px);height:100%;border-radius:14px}
+#vid{object-fit:contain;background:#000;z-index:0}
+#ovc{z-index:5;pointer-events:none}
+body:not(.cam) #vid, body:not(.cam) #ovc{display:none}
+body.cam .panel{background:transparent;border-color:rgba(255,255,255,.25);z-index:4}
+body.cam .panel:active{background:rgba(255,255,255,.06)}
+body.cam .panel .half.top{border-bottom-color:transparent}
+body.cam .net{visibility:hidden}
+body.cam .score{align-items:flex-start;padding-top:6px}
+body.cam .score b{font-size:clamp(56px,13vw,150px);background:rgba(0,0,0,.45);padding:0 18px;border-radius:14px}
+body.cam .badge{top:0;margin-top:clamp(66px,15vw,170px)}
+body.cam .half.top .chip{align-self:flex-end;margin:0 0 8px;opacity:.85}
+body.cam .half.bot .chip{opacity:.85}
+body.calib #ovc{pointer-events:auto;z-index:20;touch-action:none}
+#camPill{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:30;background:rgba(0,0,0,.7);padding:6px 14px;border-radius:999px;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+#camPill i{width:9px;height:9px;border-radius:50%;background:#777;display:inline-block}
+#camPill.ready i{background:#2fae64}#camPill.track i{background:#ffc21a;box-shadow:0 0 10px #ffc21a}#camPill.cool i{background:#777}
+#camBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(120px + env(safe-area-inset-bottom));z-index:40;background:#fff;color:#06140c;border-radius:16px;padding:12px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 14px 40px rgba(0,0,0,.5);max-width:94vw}
+#camBar .t{font-weight:700;font-size:15px}
+#camBar .t small{display:block;font-weight:600;color:#4b5d52;font-size:12px}
+#camBar button{padding:10px 14px;border-radius:10px;font-weight:700;font-size:14px}
+#camBar .no{background:#f1d4d4;color:#7a1414}#camBar .yes{background:#2fae64;color:#04140a}
+#camBar .bar{position:absolute;left:0;bottom:0;height:4px;background:#2fae64;border-radius:0 0 16px 16px}
+#calibBox{position:fixed;left:50%;top:calc(66px + env(safe-area-inset-top));transform:translateX(-50%);z-index:41;background:rgba(10,22,16,.95);border:1px solid #2a4a37;border-radius:16px;padding:14px 16px;width:min(440px,94vw);font-size:14px;line-height:1.6}
+#calibBox b.r{color:#ff6b6b}#calibBox b.y{color:#ffd23f}
+#calibBox .btns{display:flex;gap:8px;margin-top:10px}
+#calibBox button{flex:1;padding:11px;border-radius:10px;font-weight:700;background:#1c3a29}
+#calibBox button.pri{background:#2fae64;color:#04140a}
+
+@media (max-height:520px){
+  header{min-height:44px;padding:4px 12px}
+  footer{padding:4px 12px 6px} footer button{padding:9px}
+  .status{padding:4px;min-height:22px;font-size:13px}
+  .score b{font-size:clamp(70px,22vh,260px)}
+  .badge{margin-top:clamp(40px,12vh,120px)}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= SETUP ================= -->
+<section id="setup">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="46" height="46" viewBox="0 0 48 48" aria-hidden="true">
+        <circle cx="24" cy="36" r="8" fill="#fff"/>
+        <path d="M17 33 L10 6 L38 6 L31 33 Z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M24 31 L24 6 M20.5 32 L16 6 M27.5 32 L32 6 M13 18 H35" stroke="#fff" stroke-width="1.6" opacity=".7"/>
+      </svg>
+      <div><h1>นับแต้มแบดมินตัน</h1><p>กติกา BWF คิดให้อัตโนมัติ · แตะฝั่งที่ได้แต้ม</p></div>
+    </div>
+
+    <div id="resumeCard" class="card hidden">
+      <h2>มีแมตช์ที่ค้างอยู่</h2>
+      <p id="resumeInfo" style="font-size:15px;margin-bottom:10px"></p>
+      <button class="big" id="btnResume">เล่นต่อ</button>
+    </div>
+
+    <div class="card">
+      <h2>ประเภท</h2>
+      <div class="seg" id="segMode">
+        <button data-v="singles" class="on">เดี่ยว</button>
+        <button data-v="doubles">คู่</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>ผู้เล่น</h2>
+      <div class="team" style="margin-bottom:14px">
+        <label><span class="dot" style="background:var(--A)"></span>ฝั่ง A</label>
+        <div class="row2" id="rowA">
+          <input type="text" id="a1" placeholder="ผู้เล่น A1" maxlength="20">
+          <input type="text" id="a2" placeholder="ผู้เล่น A2" maxlength="20">
+        </div>
+      </div>
+      <div class="team">
+        <label><span class="dot" style="background:var(--B)"></span>ฝั่ง B</label>
+        <div class="row2" id="rowB">
+          <input type="text" id="b1" placeholder="ผู้เล่น B1" maxlength="20">
+          <input type="text" id="b2" placeholder="ผู้เล่น B2" maxlength="20">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>ระบบแต้ม</h2>
+      <div class="seg" id="segTarget">
+        <button data-v="21" class="on">21 แต้ม</button>
+        <button data-v="15">15 แต้ม</button>
+        <button data-v="11">11 แต้ม</button>
+      </div>
+      <h2 style="margin-top:14px">จำนวนเกม</h2>
+      <div class="seg" id="segBest">
+        <button data-v="1">1 เกม</button>
+        <button data-v="3" class="on">2 ใน 3</button>
+        <button data-v="5">3 ใน 5</button>
+      </div>
+      <h2 style="margin-top:14px">ใครเสิร์ฟก่อน</h2>
+      <div class="seg" id="segFirst">
+        <button data-v="A" class="on">ฝั่ง A</button>
+        <button data-v="B">ฝั่ง B</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toggle"><span>ขานแต้มด้วยเสียง<small>อ่านแต้มแบบกรรมการ (ภาษาอังกฤษ)</small></span><button class="sw" id="swVoice" aria-label="ขานแต้มด้วยเสียง"></button></div>
+      <div class="toggle" style="margin-top:10px"><span>นับเวลาพักอัตโนมัติ<small>พักที่แต้มครึ่งเกม 60 วิ / ระหว่างเกม 120 วิ</small></span><button class="sw on" id="swBreak" aria-label="นับเวลาพัก"></button></div>
+    </div>
+
+    <button class="big" id="btnStart">เริ่มแข่ง</button>
+
+    <div class="rules">
+      <b style="color:var(--ink)">ระบบคิดให้อัตโนมัติ</b><br>
+      • แรลลี่พอยต์ ใครชนะลูกได้แต้ม · ต้องนำ 2 แต้ม แต่ไม่เกินแต้มเพดาน (21→30, 15→21, 11→15)<br>
+      • เสิร์ฟจากคอร์ตขวาเมื่อแต้มผู้เสิร์ฟเป็นเลขคู่ คอร์ตซ้ายเมื่อเป็นเลขคี่<br>
+      • ประเภทคู่: ฝั่งเสิร์ฟได้แต้ม ผู้เสิร์ฟสลับคอร์ตกับคู่ ส่วนฝั่งรับไม่ขยับ<br>
+      • ผู้ชนะเกมได้เสิร์ฟก่อนเกมถัดไป · สลับแดนทุกจบเกม และกลางเกมตัดสิน<br>
+      • ปุ่มลัดบนคีย์บอร์ด: ← / → ให้แต้ม, Z ย้อนกลับ
+    </div>
+  </div>
+</section>
+
+<!-- ================= GAME ================= -->
+<section id="game" class="hidden">
+  <header>
+    <div class="hteam" id="hL"></div>
+    <div class="hmid"><div class="g" id="hGame"></div><div class="prev" id="hPrev"></div></div>
+    <div class="hteam r" id="hR"></div>
+  </header>
+  <main>
+    <video id="vid" playsinline muted autoplay></video>
+    <canvas id="ovc"></canvas>
+    <div class="panel L" id="pL"></div>
+    <div class="net"></div>
+    <div class="panel R" id="pR"></div>
+  </main>
+  <div class="status" id="status"></div>
+  <footer>
+    <button id="btnUndo"><span class="ico">↶</span>ย้อนแต้ม</button>
+    <button id="btnCam"><span class="ico">📷</span>กล้อง</button>
+    <button id="btnMenu"><span class="ico">☰</span>เมนู</button>
+  </footer>
+</section>
+
+<div id="camPill" class="hidden"><i></i><span id="camPillT">กล้อง</span></div>
+<div id="camBar" class="hidden"></div>
+<div id="calibBox" class="hidden">
+  <b>ตั้งตำแหน่งกล้อง</b><br>
+  วางโทรศัพท์บนขาตั้งข้างคอร์ต ให้เห็นทั้งสองฝั่ง แล้วลาก<br>
+  • เส้น<b class="r">แดง</b> ให้ตรงกับ<b>เสาเน็ต</b> (แบ่งฝั่งซ้าย/ขวา)<br>
+  • เส้น<b class="y">เหลือง</b> ให้อยู่<b>ระดับพื้นคอร์ต</b> ตรงที่ลูกตก (ใต้เส้นนี้ = พื้น)
+  <div class="btns"><button id="calFlip">สลับซ้าย/ขวา</button><button class="pri" id="calDone">เสร็จ</button></div>
+</div>
+
+<div id="overlay" class="ov hidden"><div class="box" id="ovBox"></div></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const KEY = 'badminton-score.v1';
+const other = t => t === 'A' ? 'B' : 'A';
+
+let cfg = { mode:'singles', target:21, bestOf:3, first:'A', voice:false, breaks:true, names:{A:[],B:[]} };
+let M = null;          // current match state
+let hist = [];         // undo snapshots
+let timerId = null, wakeLock = null;
+
+/* ---------- storage ---------- */
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify({cfg, M, hist:hist.slice(-300)})); }catch(e){} }
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ return null; } }
+function clearSaved(){ try{ localStorage.removeItem(KEY); }catch(e){} }
+
+/* ---------- helpers ---------- */
+const capOf = t => t === 21 ? 30 : t === 15 ? 21 : 15;
+const midOf = t => Math.ceil(t/2);
+const need = () => Math.floor(cfg.bestOf/2) + 1;
+const gamesWon = t => M.games.filter(g => g.w === t).length;
+const isDeciding = () => gamesWon('A') === need()-1 && gamesWon('B') === need()-1;
+const serveCourt = () => M.cur[M.server] % 2 === 0 ? 'R' : 'L';
+const wouldWin = (s,o) => { s++; return (s >= cfg.target && s-o >= 2) || s >= capOf(cfg.target); };
+const isGP = t => wouldWin(M.cur[t], M.cur[other(t)]);
+const isMP = t => isGP(t) && gamesWon(t) === need()-1;
+const teamName = t => cfg.names[t].join(' / ');
+function playerIn(team, court){ if(cfg.mode==='singles') return 0; return court==='R' ? M.pos[team] : 1-M.pos[team]; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function snapshot(){ hist.push(JSON.stringify(M)); if(hist.length>400) hist.shift(); }
+
+/* ---------- setup UI ---------- */
+function bindSeg(id, key, cast){
+  const el = $(id);
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    el.querySelectorAll('button').forEach(x => x.classList.toggle('on', x===b));
+    cfg[key] = cast ? cast(b.dataset.v) : b.dataset.v;
+    if(key==='mode') syncMode();
+  });
+}
+function setSeg(id, v){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v==String(v))); }
+function syncMode(){
+  const d = cfg.mode==='doubles';
+  ['#a2','#b2'].forEach(s => $(s).classList.toggle('hidden', !d));
+  ['#rowA','#rowB'].forEach(s => $(s).style.gridTemplateColumns = d ? '1fr 1fr' : '1fr');
+  $('#a1').placeholder = d ? 'ผู้เล่น A1' : 'ชื่อผู้เล่น A';
+  $('#b1').placeholder = d ? 'ผู้เล่น B1' : 'ชื่อผู้เล่น B';
+}
+bindSeg('#segMode','mode'); bindSeg('#segTarget','target',Number); bindSeg('#segBest','bestOf',Number); bindSeg('#segFirst','first');
+$('#swVoice').onclick = () => { cfg.voice = !cfg.voice; $('#swVoice').classList.toggle('on', cfg.voice); if(cfg.voice) speak('Voice on'); };
+$('#swBreak').onclick = () => { cfg.breaks = !cfg.breaks; $('#swBreak').classList.toggle('on', cfg.breaks); };
+
+function readNames(){
+  const v = (id, def) => ($(id).value.trim() || def);
+  cfg.names = cfg.mode==='doubles'
+    ? { A:[v('#a1','A1'), v('#a2','A2')], B:[v('#b1','B1'), v('#b2','B2')] }
+    : { A:[v('#a1','ผู้เล่น A')], B:[v('#b1','ผู้เล่น B')] };
+}
+
+function newMatch(){
+  M = { games:[], cur:{A:0,B:0}, server:cfg.first, pos:{A:0,B:0}, left:'A', midDone:false, over:false, winner:null, start:Date.now() };
+  hist = [];
+}
+
+$('#btnStart').onclick = () => { readNames(); newMatch(); enterGame(); speakCall('Love all'); };
+$('#btnResume').onclick = () => { const s = load(); if(!s) return; cfg = s.cfg; M = s.M; hist = s.hist||[]; enterGame(); };
+
+function enterGame(){
+  $('#setup').classList.add('hidden'); $('#game').classList.remove('hidden');
+  requestWake(); save(); render();
+  if(M.over) showEnd();
+}
+function exitToSetup(){
+  closeOv(); releaseWake(); if(C.on) camStop();
+  $('#game').classList.add('hidden'); $('#setup').classList.remove('hidden');
+  initSetup();
+}
+
+/* ---------- scoring core ---------- */
+function point(team){
+  if(!M || M.over) return;
+  snapshot();
+  const prevServer = M.server;
+  M.cur[team]++;
+  if(team === M.server){ if(cfg.mode==='doubles') M.pos[team] ^= 1; }
+  else M.server = team;
+
+  const s = M.cur[team], o = M.cur[other(team)];
+  const ev = [];
+  if((s >= cfg.target && s-o >= 2) || s >= capOf(cfg.target)){
+    M.games.push({A:M.cur.A, B:M.cur.B, w:team});
+    if(gamesWon(team) >= need()){ M.over = true; M.winner = team; ev.push('match'); }
+    else {
+      M.cur = {A:0,B:0}; M.server = team; M.left = other(M.left);
+      M.pos = {A:0,B:0}; M.midDone = false; ev.push('game');
+    }
+  } else if(!M.midDone && s === midOf(cfg.target) && o < s){
+    M.midDone = true; ev.push('interval');
+    if(isDeciding()){ M.left = other(M.left); ev.push('ends'); }
+  }
+  save(); render(team);
+  try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
+
+  // announcements & breaks
+  if(ev.includes('match')){
+    speak('Game. Match won by ' + teamName(team));
+    showEnd();
+  } else if(ev.includes('game')){
+    const g = M.games[M.games.length-1];
+    toast('จบเกม ' + M.games.length + ' · ' + teamName(team) + ' ชนะ ' + Math.max(g.A,g.B) + '–' + Math.min(g.A,g.B) + ' · สลับแดน');
+    speak('Game. Won by ' + teamName(team) + '. ' + (isDeciding() ? 'Deciding game' : 'Game ' + (M.games.length+1)) + ', love all');
+    if(cfg.breaks) showBreak('พักระหว่างเกม', 120, 'สลับแดน · ' + teamName(team) + ' เสิร์ฟก่อนในเกมถัดไป');
+  } else {
+    let prefix = (prevServer !== M.server) ? 'Service over' : '';
+    let suffix = '';
+    if(ev.includes('interval')) suffix = ev.includes('ends') ? 'Interval, change ends' : 'Interval';
+    speakCall(prefix, suffix);
+    if(ev.includes('ends')) toast('เกมตัดสิน: สลับแดนที่ ' + midOf(cfg.target) + ' แต้ม');
+    if(ev.includes('interval') && cfg.breaks) showBreak('พักครึ่งเกม', 60, ev.includes('ends') ? 'เกมตัดสิน — สลับแดน' : 'ผู้เล่นพักได้ 60 วินาที');
+  }
+}
+
+function undo(){
+  if(!hist.length) return;
+  M = JSON.parse(hist.pop()); save(); closeOv(); stopTimer(); render();
+  toast('ย้อนกลับ 1 แต้ม');
+}
+
+function swapPositions(team){
+  if(M.cur.A || M.cur.B) return;
+  snapshot(); M.pos[team] ^= 1; save(); render();
+}
+
+/* ---------- render ---------- */
+function slotFor(side, court){ return side==='L' ? (court==='R' ? 'bot' : 'top') : (court==='R' ? 'top' : 'bot'); }
+
+function render(flashTeam){
+  const L = M.left, R = other(L);
+  // header
+  const hHTML = (t, right) => {
+    const n = `<span class="dot" style="background:var(--${t})"></span><span class="nm">${esc(teamName(t))}</span>`;
+    const g = `<span class="gw" style="color:var(--${t})">${gamesWon(t)}</span>`;
+    return right ? g + n : n + g;
+  };
+  // left header shows name then games; right header games... keep games near center
+  $('#hL').innerHTML = `<span class="dot" style="background:var(--${L})"></span><span class="nm">${esc(teamName(L))}</span><span class="gw" style="color:var(--${L});margin-left:auto">${gamesWon(L)}</span>`;
+  $('#hR').innerHTML = `<span class="gw" style="color:var(--${R});margin-right:auto">${gamesWon(R)}</span><span class="nm">${esc(teamName(R))}</span><span class="dot" style="background:var(--${R})"></span>`;
+  const gnum = M.over ? M.games.length : M.games.length+1;
+  $('#hGame').textContent = M.over ? 'จบแมตช์' : (isDeciding() && cfg.bestOf>1 ? 'เกมตัดสิน' : 'เกม ' + gnum) ;
+  $('#hPrev').textContent = M.games.map(g => g[L] + '-' + g[R]).join(' · ') || (cfg.target + ' แต้ม · ' + (cfg.bestOf===1?'1 เกม':Math.ceil(cfg.bestOf/2)+' ใน '+cfg.bestOf));
+
+  drawPanel($('#pL'), 'L', L);
+  drawPanel($('#pR'), 'R', R);
+  if(flashTeam){ const p = flashTeam===L ? $('#pL') : $('#pR'); p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); }
+
+  // status
+  if(M.over){ $('#status').innerHTML = `<strong>${esc(teamName(M.winner))}</strong> ชนะ`; }
+  else {
+    const c = serveCourt();
+    const srv = cfg.names[M.server][playerIn(M.server, c)];
+    const rcv = cfg.names[other(M.server)][playerIn(other(M.server), c)];
+    $('#status').innerHTML = `🏸 <strong>${esc(srv)}</strong> เสิร์ฟจากคอร์ต${c==='R'?'ขวา':'ซ้าย'} → ${esc(rcv)} รับ`;
+  }
+  $('#btnUndo').disabled = !hist.length;
+}
+
+function drawPanel(el, side, team){
+  el.className = 'panel ' + side + ' t' + team;
+  const c = serveCourt();
+  const slots = {top:'', bot:''};
+  const nPlayers = cfg.mode==='doubles' ? 2 : 1;
+  for(let i=0;i<nPlayers;i++){
+    const court = cfg.mode==='doubles' ? (i===M.pos[team] ? 'R' : 'L') : c;
+    const isSrv = !M.over && team===M.server && i===playerIn(team,c);
+    const isRcv = !M.over && team!==M.server && i===playerIn(team,c);
+    slots[slotFor(side,court)] += `<span class="chip ${isSrv?'srv':''} ${isRcv?'rcv':''}">${isSrv?'<span class="ic">🏸</span>':''}${esc(cfg.names[team][i])}${isRcv?' · รับ':''}</span>`;
+  }
+  let badge = '';
+  if(!M.over){
+    if(isMP(team)) badge = '<div class="badge">MATCH POINT</div>';
+    else if(isGP(team)) badge = '<div class="badge gp">GAME POINT</div>';
+  }
+  const swap = (cfg.mode==='doubles' && !M.over && M.cur.A===0 && M.cur.B===0)
+    ? `<button class="swapP" data-swap="${team}" aria-label="สลับตำแหน่งยืน">⇅</button>` : '';
+  el.innerHTML = `<div class="half top">${slots.top}</div><div class="half bot">${slots.bot}</div>
+    <div class="score"><b>${M.cur[team]}</b></div>${badge}${swap}`;
+  el.dataset.team = team;
+}
+
+$('#pL').addEventListener('click', e => { const s = e.target.closest('[data-swap]'); if(s){ e.stopPropagation(); swapPositions(s.dataset.swap); return; } point($('#pL').dataset.team); });
+$('#pR').addEventListener('click', e => { const s = e.target.closest('[data-swap]'); if(s){ e.stopPropagation(); swapPositions(s.dataset.swap); return; } point($('#pR').dataset.team); });
+$('#btnUndo').onclick = undo;
+$('#btnMenu').onclick = showMenu;
+
+document.addEventListener('keydown', e => {
+  if($('#game').classList.contains('hidden') || e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowLeft'){ if(ovOpen()) return; point(M.left); }
+  else if(e.key==='ArrowRight'){ if(ovOpen()) return; point(other(M.left)); }
+  else if(e.key==='z' || e.key==='Z' || e.key==='Backspace'){ e.preventDefault(); undo(); }
+  else if(e.key==='Escape'){ closeOv(); }
+});
+
+/* ---------- voice ---------- */
+function speak(text){
+  if(!cfg.voice) return;
+  try{
+    const u = new SpeechSynthesisUtterance(text); u.lang='en-US'; u.rate=1;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){}
+}
+function speakCall(prefix, suffix){
+  if(!cfg.voice) return;
+  const sv = M.server, s = M.cur[sv], r = M.cur[other(sv)];
+  const w = n => n===0 ? 'love' : String(n);
+  let t;
+  if(s===r) t = s===0 ? 'love all' : w(s) + ' all';
+  else t = w(s) + (isGP(sv) ? (isMP(sv) ? ' match point ' : ' game point ') : ', ') + w(r);
+  if(prefix === 'Love all') t = 'Love all, play';
+  else if(prefix) t = prefix + '. ' + t;
+  if(suffix) t += '. ' + suffix;
+  speak(t);
+}
+
+/* ---------- overlays ---------- */
+const ovOpen = () => !$('#overlay').classList.contains('hidden');
+function openOv(html){ $('#ovBox').innerHTML = html; $('#overlay').classList.remove('hidden'); }
+function closeOv(){ $('#overlay').classList.add('hidden'); stopTimer(); }
+function stopTimer(){ if(timerId){ clearInterval(timerId); timerId=null; } }
+
+function showBreak(title, secs, sub){
+  let left = secs;
+  openOv(`<h3>${title}</h3><p>${esc(sub)}</p><div class="timer" id="tm">${fmt(left)}</div>
+    <div class="btns"><button class="pri" id="bGo">เล่นต่อ</button></div>`);
+  $('#bGo').onclick = closeOv;
+  stopTimer();
+  timerId = setInterval(() => {
+    left--; const el = $('#tm'); if(!el){ stopTimer(); return; }
+    el.textContent = fmt(Math.max(0,left));
+    el.classList.toggle('warn', left<=20);
+    if(left===20) speak('Twenty seconds');
+    if(left<=0){ stopTimer(); speak('Play'); el.textContent='0:00'; }
+  }, 1000);
+}
+const fmt = s => Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+
+function resultText(){
+  const lines = M.games.map((g,i) => `เกม ${i+1}: ${g.A}-${g.B}`);
+  const mins = Math.round((Date.now()-M.start)/60000);
+  return `🏸 ${teamName('A')} vs ${teamName('B')}\n${lines.join('\n')}\nผู้ชนะ: ${teamName(M.winner)} (${gamesWon('A')}-${gamesWon('B')})${mins>0?`\nเวลาแข่ง ~${mins} นาที`:''}`;
+}
+
+function showEnd(){
+  const rows = M.games.map((g,i) => `<div><span>เกม ${i+1}</span><span><span style="color:var(--A)">${g.A}</span> – <span style="color:var(--B)">${g.B}</span></span></div>`).join('');
+  openOv(`<div class="trophy">🏆</div><h3>${esc(teamName(M.winner))} ชนะ!</h3>
+    <p>${gamesWon(M.winner)} – ${gamesWon(other(M.winner))} เกม</p>
+    <div class="res">${rows}</div>
+    <div class="btns">
+      <button class="pri" id="bRe">แข่งใหม่ (ชื่อเดิม)</button>
+      <button id="bCopy">คัดลอกผลการแข่ง</button>
+      <button id="bUndoEnd">ย้อนแต้มสุดท้าย</button>
+      <button id="bHome">กลับหน้าตั้งค่า</button>
+    </div>`);
+  $('#bRe').onclick = () => { closeOv(); newMatch(); save(); render(); speakCall('Love all'); };
+  $('#bCopy').onclick = async () => { try{ await navigator.clipboard.writeText(resultText()); toast('คัดลอกแล้ว'); }catch(e){ toast('คัดลอกไม่ได้ในเบราว์เซอร์นี้'); } };
+  $('#bUndoEnd').onclick = undo;
+  $('#bHome').onclick = () => { clearSaved(); exitToSetup(); };
+}
+
+function showMenu(){
+  openOv(`<div class="menu"><h3>เมนู</h3>
+    <div class="btns">
+      <button id="mVoice">ขานแต้มด้วยเสียง <span class="sw ${cfg.voice?'on':''}"></span></button>
+      <button id="mBreak">นับเวลาพักอัตโนมัติ <span class="sw ${cfg.breaks?'on':''}"></span></button>
+      <button id="mEnds">สลับแดนเอง <span>⇄</span></button>
+      <button id="mServe">แก้ฝั่งเสิร์ฟ <span>🏸</span></button>
+      <button id="mFull">เต็มจอ <span>⛶</span></button>
+      <button class="dng" id="mQuit">จบแมตช์ / ตั้งค่าใหม่ <span>✕</span></button>
+      <button class="pri" id="mClose" style="text-align:center;justify-content:center">ปิด</button>
+    </div></div>`);
+  $('#mVoice').onclick = () => { cfg.voice=!cfg.voice; save(); showMenu(); if(cfg.voice) speak('Voice on'); };
+  $('#mBreak').onclick = () => { cfg.breaks=!cfg.breaks; save(); showMenu(); };
+  $('#mEnds').onclick = () => { snapshot(); M.left = other(M.left); save(); render(); closeOv(); toast('สลับแดนแล้ว'); };
+  $('#mServe').onclick = () => { snapshot(); M.server = other(M.server); save(); render(); closeOv(); toast('เปลี่ยนฝั่งเสิร์ฟเป็น ' + teamName(M.server)); };
+  $('#mFull').onclick = async () => { try{ if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }catch(e){ toast('เต็มจอไม่ได้ในหน้านี้'); } closeOv(); };
+  $('#mQuit').onclick = confirmQuit;
+  $('#mClose').onclick = closeOv;
+}
+function confirmQuit(){
+  openOv(`<h3>จบแมตช์นี้?</h3><p>แต้มของแมตช์นี้จะถูกล้าง</p>
+    <div class="btns"><button class="dng" id="qYes">จบแมตช์</button><button id="qNo">ยกเลิก</button></div>`);
+  $('#qYes').onclick = () => { clearSaved(); exitToSetup(); };
+  $('#qNo').onclick = closeOv;
+}
+
+let toastT;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden'); t.style.opacity=1;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.style.opacity=0; setTimeout(()=>t.classList.add('hidden'),300); }, 2200);
+}
+
+/* ---------- wake lock ---------- */
+async function requestWake(){ try{ if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }catch(e){} }
+function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch(e){} wakeLock=null; }
+document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible' && !$('#game').classList.contains('hidden')) requestWake(); });
+
+/* =====================================================================
+   CAMERA MODE — tracks the shuttle by frame differencing, awards the
+   point to the opposite side when the shuttle stops below the floor line
+   ===================================================================== */
+const CKEY = 'badminton-cam.v1';
+const C = { on:false, stream:null, calib:false, debug:false, auto:true, sens:1, netX:.5, floorY:.72, hasCalib:false };
+try{ Object.assign(C, JSON.parse(localStorage.getItem(CKEY)||'{}'), {on:false, stream:null, calib:false}); }catch(e){}
+const saveCam = () => { try{ localStorage.setItem(CKEY, JSON.stringify({debug:C.debug, auto:C.auto, sens:C.sens, netX:C.netX, floorY:C.floorY, hasCalib:C.hasCalib})); }catch(e){} };
+const SENS = [ {label:'ต่ำ', thr:38, minA:3}, {label:'กลาง', thr:26, minA:2}, {label:'สูง', thr:16, minA:1} ];
+
+const vid = $('#vid'), ovc = $('#ovc'), octx = ovc.getContext('2d');
+const work = document.createElement('canvas'), wctx = work.getContext('2d', {willReadFrequently:true});
+const maskCv = document.createElement('canvas'), mctx = maskCv.getContext('2d');
+let W = 0, H = 0, prevGray = null, gray = null, mask = null, maskImg = null;
+let track = null, lastAward = 0, pending = null, loopId = null, lastTick = 0, motionAvg = 0;
+const COOLDOWN = 3500;     // ms after a point before detecting the next rally end
+const LOST_FRAMES = 6;     // frames without the shuttle → it has stopped
+
+async function camStart(){
+  if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    openOv(`<h3>เปิดกล้องไม่ได้</h3><p>เบราว์เซอร์อนุญาตกล้องเฉพาะหน้าเว็บที่เปิดผ่าน <b>https://</b> หรือ localhost<br>ลองอัปไฟล์นี้ขึ้นเว็บโฮสต์ (เช่น Netlify Drop หรือ GitHub Pages) แล้วเปิดลิงก์ https ในมือถือ</p><div class="btns"><button class="pri" id="cOk">ตกลง</button></div>`);
+    $('#cOk').onclick = closeOv; return;
+  }
+  try{
+    C.stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:60} } });
+  }catch(e){
+    openOv(`<h3>ไม่ได้รับสิทธิ์กล้อง</h3><p>กรุณาอนุญาตการใช้กล้องในการตั้งค่าเบราว์เซอร์ แล้วลองใหม่<br><small>${esc(e.name||'')}</small></p><div class="btns"><button class="pri" id="cOk">ตกลง</button></div>`);
+    $('#cOk').onclick = closeOv; return;
+  }
+  vid.srcObject = C.stream;
+  try{ await vid.play(); }catch(e){}
+  C.on = true; document.body.classList.add('cam');
+  $('#camPill').classList.remove('hidden');
+  prevGray = null; track = null; lastAward = Date.now();
+  loop();
+  if(!C.hasCalib) startCalib(); else toast('กล้องพร้อม · ให้แต้ม' + (C.auto ? 'อัตโนมัติ' : 'แบบถามก่อน'));
+}
+function camStop(){
+  try{ C.stream && C.stream.getTracks().forEach(t => t.stop()); }catch(e){}
+  C.stream = null; C.on = false; vid.srcObject = null;
+  document.body.classList.remove('cam','calib');
+  $('#camPill').classList.add('hidden'); $('#calibBox').classList.add('hidden'); hidePending();
+  if(loopId) cancelAnimationFrame(loopId); loopId = null;
+  octx.clearRect(0,0,ovc.width,ovc.height);
+}
+
+/* rectangle of the visible video inside the element (object-fit: contain) */
+function vrect(){
+  const ew = ovc.clientWidth, eh = ovc.clientHeight, vw = vid.videoWidth || 16, vh = vid.videoHeight || 9;
+  const s = Math.min(ew/vw, eh/vh), w = vw*s, h = vh*s;
+  return { x:(ew-w)/2, y:(eh-h)/2, w, h };
+}
+
+function loop(){
+  loopId = requestAnimationFrame(loop);
+  const now = performance.now();
+  if(now - lastTick < 28) return;        // ~35 fps processing cap
+  lastTick = now;
+  if(!vid.videoWidth) return;
+  processFrame();
+  drawOverlay();
+}
+
+function processFrame(){
+  const nw = 320, nh = Math.round(320 * vid.videoHeight / vid.videoWidth);
+  if(nw !== W || nh !== H){
+    W = nw; H = nh; work.width = W; work.height = H; maskCv.width = W; maskCv.height = H;
+    gray = new Uint8Array(W*H); prevGray = null; mask = new Uint8Array(W*H); maskImg = mctx.createImageData(W,H);
+  }
+  wctx.drawImage(vid, 0, 0, W, H);
+  const d = wctx.getImageData(0,0,W,H).data;
+  const cur = gray, sp = SENS[C.sens] || SENS[1];
+  for(let i=0,j=0;i<cur.length;i++,j+=4) cur[i] = (d[j]*77 + d[j+1]*150 + d[j+2]*29) >> 8;
+  if(!prevGray){ prevGray = new Uint8Array(cur); return; }
+
+  let moving = 0;
+  for(let i=0;i<cur.length;i++){ const m = Math.abs(cur[i]-prevGray[i]) > sp.thr ? 1 : 0; mask[i] = m; moving += m; }
+  prevGray.set(cur);
+  motionAvg = motionAvg*0.9 + (moving/(W*H))*0.1;
+
+  // camera shake / lighting flicker: skip frame
+  if(moving > W*H*0.25){ track = null; return; }
+
+  const blobs = findBlobs(sp.minA);
+  updateTrack(blobs);
+}
+
+/* connected components on the motion mask; keep small, compact blobs (shuttle-sized) */
+function findBlobs(minA){
+  const seen = new Uint8Array(W*H), out = [], stack = [];
+  const maxA = Math.max(40, (W*H) * 0.0025), maxSide = Math.round(W*0.07);
+  for(let p=0;p<mask.length;p++){
+    if(!mask[p] || seen[p]) continue;
+    let area=0, sx=0, sy=0, x0=W, x1=0, y0=H, y1=0, big=false;
+    stack.length = 0; stack.push(p); seen[p] = 1;
+    while(stack.length){
+      const q = stack.pop(), x = q % W, y = (q / W) | 0;
+      area++; sx += x; sy += y;
+      if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
+      if(area > maxA*4){ big = true; }
+      // 8-neighbourhood
+      for(let dy=-1;dy<=1;dy++){ const yy=y+dy; if(yy<0||yy>=H) continue;
+        for(let dx=-1;dx<=1;dx++){ const xx=x+dx; if(xx<0||xx>=W) continue;
+          const r = yy*W+xx; if(mask[r] && !seen[r]){ seen[r]=1; stack.push(r); } } }
+    }
+    if(big || area < minA || area > maxA) continue;
+    if(x1-x0 > maxSide || y1-y0 > maxSide) continue;
+    out.push({ x:sx/area, y:sy/area, a:area });
+  }
+  return out;
+}
+
+function updateTrack(blobs){
+  const now = Date.now();
+  const armed = !pending && !M.over && !C.calib && !ovOpen() && now - lastAward > COOLDOWN;
+  if(!armed){ track = null; setPill(now - lastAward <= COOLDOWN || pending ? 'cool' : 'idle'); return; }
+
+  if(track){
+    const n = track.pts.length, last = track.pts[n-1];
+    const prev = n > 1 ? track.pts[n-2] : last;
+    const px = last.x + (last.x - prev.x), py = last.y + (last.y - prev.y);
+    const speed = Math.hypot(last.x-prev.x, last.y-prev.y);
+    const gate = W*0.06 + speed*1.5;
+    let best = null, bd = Infinity;
+    for(const b of blobs){ const dd = Math.hypot(b.x-px, b.y-py); if(dd < bd){ bd = dd; best = b; } }
+    if(best && bd < gate){
+      track.pts.push({x:best.x, y:best.y}); track.lost = 0;
+      track.path += Math.hypot(best.x-last.x, best.y-last.y);
+      if(track.pts.length > 60) track.pts.shift();
+      if(!track.ok && track.pts.length >= 5 && track.path > W*0.08) track.ok = true;
+      // shuttle sitting still on the floor (still a little motion): treat as landed
+      const k = track.pts.length;
+      if(track.ok && k >= 6){
+        const a = track.pts[k-5], z = track.pts[k-1];
+        if(Math.hypot(z.x-a.x, z.y-a.y) < 2 && z.y >= C.floorY*H){ landed(z); return; }
+      }
+    } else {
+      track.lost++;
+      if(track.lost >= LOST_FRAMES){
+        const z = track.pts[track.pts.length-1];
+        if(track.ok && z.y >= C.floorY*H - H*0.04) landed(z);
+        else track = null;
+        return;
+      }
+    }
+  }
+  if(!track && blobs.length){
+    // start from the blob highest in the frame (shuttle is usually above the players)
+    let b = blobs[0]; for(const c of blobs) if(c.y < b.y) b = c;
+    track = { pts:[{x:b.x, y:b.y}], lost:0, path:0, ok:false };
+  }
+  setPill(track && track.ok ? 'track' : 'ready');
+}
+
+function landed(pt){
+  const trail = track ? track.pts.slice() : [];
+  track = null; lastAward = Date.now();
+  const side = (pt.x / W) < C.netX ? 'L' : 'R';
+  const landTeam = side === 'L' ? M.left : other(M.left);
+  const winner = other(landTeam);
+  lastLanding = { x:pt.x, y:pt.y, t:Date.now(), trail };
+  propose(winner, side);
+}
+let lastLanding = null;
+
+/* ---------- pending award bar ---------- */
+function propose(team, side){
+  hidePending();
+  const dur = 2500;
+  pending = { team, t0:Date.now() };
+  const bar = $('#camBar');
+  bar.innerHTML = `<div class="t">ลูกตกฝั่ง${side==='L'?'ซ้าย':'ขวา'} → +1 <span style="color:${team==='A'?'#b07d00':'#0a7fb5'}">${esc(teamName(team))}</span>
+      <small>${C.auto ? 'ให้แต้มอัตโนมัติใน 2 วินาที' : 'ยืนยันแต้มนี้?'}</small></div>
+    <button class="no" id="pNo">ไม่ใช่</button><button class="yes" id="pYes">ให้แต้ม</button>${C.auto?'<div class="bar" id="pBar"></div>':''}`;
+  bar.classList.remove('hidden');
+  $('#pNo').onclick = () => { hidePending(); lastAward = Date.now() - COOLDOWN + 800; toast('ยกเลิกแล้ว'); };
+  $('#pYes').onclick = commitPending;
+  try{ navigator.vibrate && navigator.vibrate([20,40,20]); }catch(e){}
+  if(C.auto){
+    pending.timer = setInterval(() => {
+      const el = $('#pBar'), f = (Date.now()-pending.t0)/dur;
+      if(el) el.style.width = Math.max(0, 100 - f*100) + '%';
+      if(f >= 1) commitPending();
+    }, 50);
+  }
+}
+function commitPending(){ if(!pending) return; const t = pending.team; hidePending(); lastAward = Date.now(); point(t); }
+function hidePending(){ if(pending && pending.timer) clearInterval(pending.timer); pending = null; $('#camBar').classList.add('hidden'); }
+
+function setPill(state){
+  const p = $('#camPill');
+  p.className = state;
+  $('#camPillT').textContent = C.calib ? 'ตั้งตำแหน่ง' : state==='track' ? 'กำลังตามลูก' : state==='ready' ? 'พร้อม · รอแรลลี่' : state==='cool' ? 'รอเสิร์ฟลูกถัดไป' : 'หยุดตรวจจับ';
+}
+
+/* ---------- overlay drawing ---------- */
+function drawOverlay(){
+  const dpr = window.devicePixelRatio || 1;
+  const cw = Math.round(ovc.clientWidth*dpr), ch = Math.round(ovc.clientHeight*dpr);
+  if(ovc.width !== cw || ovc.height !== ch){ ovc.width = cw; ovc.height = ch; }
+  octx.setTransform(dpr,0,0,dpr,0,0);
+  octx.clearRect(0,0,ovc.clientWidth,ovc.clientHeight);
+  const r = vrect(), sx = r.w / W, sy = r.h / H;
+
+  if(C.debug && mask){
+    const md = maskImg.data;
+    for(let i=0,j=0;i<mask.length;i++,j+=4){ md[j]=255; md[j+1]=40; md[j+2]=40; md[j+3]=mask[i]?170:0; }
+    mctx.putImageData(maskImg,0,0);
+    octx.imageSmoothingEnabled = false;
+    octx.drawImage(maskCv, r.x, r.y, r.w, r.h);
+  }
+
+  // floor zone shading
+  const fy = r.y + C.floorY*r.h, nx = r.x + C.netX*r.w;
+  octx.fillStyle = 'rgba(255,210,63,.08)'; octx.fillRect(r.x, fy, r.w, r.y + r.h - fy);
+  octx.lineWidth = C.calib ? 3 : 1.5;
+  octx.setLineDash(C.calib ? [] : [8,6]);
+  octx.strokeStyle = C.calib ? '#ffd23f' : 'rgba(255,210,63,.6)';
+  octx.beginPath(); octx.moveTo(r.x, fy); octx.lineTo(r.x+r.w, fy); octx.stroke();
+  octx.strokeStyle = C.calib ? '#ff6b6b' : 'rgba(255,255,255,.55)';
+  octx.beginPath(); octx.moveTo(nx, r.y); octx.lineTo(nx, r.y+r.h); octx.stroke();
+  octx.setLineDash([]);
+
+  if(C.calib){
+    handle(nx, r.y + r.h*0.18, '#ff6b6b', '⇆');
+    handle(r.x + r.w*0.82, fy, '#ffd23f', '⇅');
+  }
+
+  // live track
+  const drawTrail = (pts, color) => {
+    if(!pts || pts.length < 2) return;
+    octx.strokeStyle = color; octx.lineWidth = 3; octx.beginPath();
+    pts.forEach((p,i) => { const X = r.x+p.x*sx, Y = r.y+p.y*sy; i ? octx.lineTo(X,Y) : octx.moveTo(X,Y); });
+    octx.stroke();
+  };
+  if(track) drawTrail(track.pts, track.ok ? '#ffc21a' : 'rgba(255,255,255,.4)');
+  if(track && track.ok){ const p = track.pts[track.pts.length-1]; octx.fillStyle='#ffc21a'; octx.beginPath(); octx.arc(r.x+p.x*sx, r.y+p.y*sy, 7, 0, 7); octx.fill(); }
+
+  // last landing marker (fades over 3 s)
+  if(lastLanding){
+    const age = (Date.now() - lastLanding.t) / 3000;
+    if(age < 1){
+      octx.globalAlpha = 1 - age;
+      drawTrail(lastLanding.trail, '#ffffff');
+      const X = r.x + lastLanding.x*sx, Y = r.y + lastLanding.y*sy;
+      octx.strokeStyle = '#ff3b3b'; octx.lineWidth = 4;
+      octx.beginPath(); octx.arc(X, Y, 18 + age*20, 0, 7); octx.stroke();
+      octx.globalAlpha = 1;
+    } else lastLanding = null;
+  }
+}
+function handle(x, y, color, glyph){
+  octx.fillStyle = color; octx.beginPath(); octx.arc(x, y, 18, 0, 7); octx.fill();
+  octx.fillStyle = '#06140c'; octx.font = 'bold 18px sans-serif'; octx.textAlign = 'center'; octx.textBaseline = 'middle';
+  octx.fillText(glyph, x, y+1);
+}
+
+/* ---------- calibration (drag lines) ---------- */
+let dragging = null;
+function startCalib(){
+  C.calib = true; hidePending(); document.body.classList.add('calib');
+  $('#calibBox').classList.remove('hidden'); setPill('idle');
+}
+function endCalib(){
+  C.calib = false; C.hasCalib = true; saveCam();
+  document.body.classList.remove('calib'); $('#calibBox').classList.add('hidden');
+  lastAward = Date.now(); toast('บันทึกตำแหน่งแล้ว');
+}
+$('#calDone').onclick = endCalib;
+$('#calFlip').onclick = () => { snapshot(); M.left = other(M.left); save(); render(); toast('สลับฝั่งทีมแล้ว — ฝั่งซ้ายของภาพคือ ' + teamName(M.left)); };
+ovc.addEventListener('pointerdown', e => {
+  if(!C.calib) return;
+  const b = ovc.getBoundingClientRect(), r = vrect(), x = e.clientX - b.left, y = e.clientY - b.top;
+  const dNet = Math.abs(x - (r.x + C.netX*r.w)), dFloor = Math.abs(y - (r.y + C.floorY*r.h));
+  dragging = dNet < dFloor ? 'net' : 'floor';
+  ovc.setPointerCapture(e.pointerId); moveLine(e);
+});
+ovc.addEventListener('pointermove', e => { if(dragging) moveLine(e); });
+ovc.addEventListener('pointerup', () => { dragging = null; });
+function moveLine(e){
+  const b = ovc.getBoundingClientRect(), r = vrect();
+  if(dragging === 'net') C.netX = Math.min(.95, Math.max(.05, (e.clientX - b.left - r.x) / r.w));
+  else C.floorY = Math.min(.98, Math.max(.2, (e.clientY - b.top - r.y) / r.h));
+}
+
+/* ---------- camera menu ---------- */
+function camMenu(){
+  openOv(`<div class="menu"><h3>โหมดกล้อง</h3>
+    <div class="btns">
+      <button id="cAuto">ให้แต้มอัตโนมัติ <span class="sw ${C.auto?'on':''}"></span></button>
+      <button id="cSens">ความไวการจับลูก <span>${SENS[C.sens].label}</span></button>
+      <button id="cCal">ตั้งเส้นเน็ต / พื้น <span>📐</span></button>
+      <button id="cDbg">แสดงการตรวจจับ <span class="sw ${C.debug?'on':''}"></span></button>
+      <button class="dng" id="cOff">ปิดกล้อง <span>✕</span></button>
+      <button class="pri" id="cClose" style="text-align:center;justify-content:center">ปิด</button>
+    </div>
+    <p style="margin-top:12px;font-size:12.5px;text-align:left">ระบบดูว่าลูกตกพื้นฝั่งไหนแล้วให้แต้มอีกฝั่ง ยังแยกลูกออกหรือลูกเสียที่ไม่ตกพื้น (ติดเน็ต, ฟาล์ว) ไม่ได้ — แตะฝั่งที่ได้แต้มเองหรือกด "ไม่ใช่" ได้ตลอด</p></div>`);
+  $('#cAuto').onclick = () => { C.auto = !C.auto; saveCam(); camMenu(); };
+  $('#cSens').onclick = () => { C.sens = (C.sens+1) % SENS.length; saveCam(); camMenu(); };
+  $('#cCal').onclick = () => { closeOv(); startCalib(); };
+  $('#cDbg').onclick = () => { C.debug = !C.debug; saveCam(); camMenu(); };
+  $('#cOff').onclick = () => { closeOv(); camStop(); };
+  $('#cClose').onclick = closeOv;
+}
+$('#btnCam').onclick = () => C.on ? camMenu() : camStart();
+// manual taps/undo during a pending award cancel it
+['#pL','#pR','#btnUndo'].forEach(s => $(s).addEventListener('click', () => { if(pending){ hidePending(); lastAward = Date.now(); } }, true));
+
+/* ---------- init ---------- */
+function initSetup(){
+  const s = load();
+  if(s && s.M && !s.M.over){
+    cfg = Object.assign(cfg, s.cfg);
+    const sM = s.M;
+    $('#resumeInfo').innerHTML = `${esc(s.cfg.names.A.join(' / '))} <b style="color:var(--A)">${sM.cur.A}</b> – <b style="color:var(--B)">${sM.cur.B}</b> ${esc(s.cfg.names.B.join(' / '))}<br><span style="color:var(--mute);font-size:13px">เกม ${sM.games.length+1}</span>`;
+    $('#resumeCard').classList.remove('hidden');
+  } else $('#resumeCard').classList.add('hidden');
+  setSeg('#segMode', cfg.mode); setSeg('#segTarget', cfg.target); setSeg('#segBest', cfg.bestOf); setSeg('#segFirst', cfg.first);
+  $('#swVoice').classList.toggle('on', cfg.voice); $('#swBreak').classList.toggle('on', cfg.breaks);
+  if(cfg.names.A.length){ $('#a1').value = cfg.names.A[0]||''; $('#a2').value = cfg.names.A[1]||''; $('#b1').value = cfg.names.B[0]||''; $('#b2').value = cfg.names.B[1]||''; }
+  syncMode();
+}
+initSetup();
+})();
+</script>
+</body>
+</html>
