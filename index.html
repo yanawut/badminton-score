@@ -263,11 +263,11 @@ body.calib #ovc{pointer-events:auto;z-index:20;touch-action:none}
 <div id="camPill" class="hidden"><i></i><span id="camPillT">กล้อง</span></div>
 <div id="camBar" class="hidden"></div>
 <div id="calibBox" class="hidden">
-  <b>ตั้งตำแหน่งกล้อง</b><br>
-  วางโทรศัพท์บนขาตั้งข้างคอร์ต ให้เห็นทั้งสองฝั่ง แล้วลาก<br>
-  • เส้น<b class="r">แดง</b> ให้ตรงกับ<b>เสาเน็ต</b> (แบ่งฝั่งซ้าย/ขวา)<br>
-  • เส้น<b class="y">เหลือง</b> ให้อยู่<b>ระดับพื้นคอร์ต</b> ตรงที่ลูกตก (ใต้เส้นนี้ = พื้น)
-  <div class="btns"><button id="calFlip">สลับซ้าย/ขวา</button><button class="pri" id="calDone">เสร็จ</button></div>
+  <div class="seg" id="calView" style="margin-bottom:10px">
+    <button data-v="side">📐 ข้างคอร์ต</button><button data-v="end">🎯 หลังคอร์ต</button>
+  </div>
+  <div id="calText"></div>
+  <div class="btns"><button id="calFlip">สลับฝั่งทีม</button><button class="pri" id="calDone">เสร็จ</button></div>
 </div>
 
 <div id="overlay" class="ov hidden"><div class="box" id="ovBox"></div></div>
@@ -585,9 +585,10 @@ document.addEventListener('visibilitychange', () => { if(document.visibilityStat
    point to the opposite side when the shuttle stops below the floor line
    ===================================================================== */
 const CKEY = 'badminton-cam.v1';
-const C = { on:false, stream:null, calib:false, debug:false, auto:true, sens:1, netX:.5, floorY:.72, hasCalib:false, facing:'environment' };
+const C = { on:false, stream:null, calib:false, debug:false, auto:true, sens:1, netX:.5, floorY:.72, netY:.55, view:'side', hasCalib:false, facing:'environment' };
 try{ Object.assign(C, JSON.parse(localStorage.getItem(CKEY)||'{}'), {on:false, stream:null, calib:false}); }catch(e){}
-const saveCam = () => { try{ localStorage.setItem(CKEY, JSON.stringify({facing:C.facing, debug:C.debug, auto:C.auto, sens:C.sens, netX:C.netX, floorY:C.floorY, hasCalib:C.hasCalib})); }catch(e){} };
+const saveCam = () => { try{ localStorage.setItem(CKEY, JSON.stringify({facing:C.facing, debug:C.debug, auto:C.auto, sens:C.sens, netX:C.netX, floorY:C.floorY, netY:C.netY, view:C.view, hasCalib:C.hasCalib})); }catch(e){} };
+const isEnd = () => C.view === 'end';
 const SENS = [ {label:'ต่ำ', thr:38, minA:3}, {label:'กลาง', thr:26, minA:2}, {label:'สูง', thr:16, minA:1} ];
 
 const vid = $('#vid'), ovc = $('#ovc'), octx = ovc.getContext('2d');
@@ -737,13 +738,16 @@ function updateTrack(blobs){
       const k = track.pts.length;
       if(track.ok && k >= 6){
         const a = track.pts[k-5], z = track.pts[k-1];
-        if(Math.hypot(z.x-a.x, z.y-a.y) < 2 && z.y >= C.floorY*H){ landed(z); return; }
+        if(Math.hypot(z.x-a.x, z.y-a.y) < 2 && (isEnd() || z.y >= C.floorY*H)){ landed(z); return; }
       }
     } else {
       track.lost++;
       if(track.lost >= LOST_FRAMES){
         const z = track.pts[track.pts.length-1];
-        if(track.ok && z.y >= C.floorY*H - H*0.04) landed(z);
+        const k = track.pts.length, a = track.pts[Math.max(0, k-5)];
+        // end view: no floor line, so require the shuttle to be coming down (or level) when it vanished
+        const ok = isEnd() ? (z.y - a.y) >= -1 : z.y >= C.floorY*H - H*0.04;
+        if(track.ok && ok) landed(z);
         else track = null;
         return;
       }
@@ -760,8 +764,9 @@ function updateTrack(blobs){
 function landed(pt){
   const trail = track ? track.pts.slice() : [];
   track = null; lastAward = Date.now();
-  const side = (pt.x / W) < C.netX ? 'L' : 'R';
-  const landTeam = side === 'L' ? M.left : other(M.left);
+  // side view: left/right of the net post · end view: near (below net line) / far
+  const side = isEnd() ? ((pt.y / H) >= C.netY ? 'N' : 'F') : ((pt.x / W) < C.netX ? 'L' : 'R');
+  const landTeam = (side === 'L' || side === 'N') ? M.left : other(M.left);
   const winner = other(landTeam);
   lastLanding = { x:pt.x, y:pt.y, t:Date.now(), trail };
   propose(winner, side);
@@ -774,7 +779,7 @@ function propose(team, side){
   const dur = 2500;
   pending = { team, t0:Date.now() };
   const bar = $('#camBar');
-  bar.innerHTML = `<div class="t">ลูกตกฝั่ง${side==='L'?'ซ้าย':'ขวา'} → +1 <span style="color:${team==='A'?'#b07d00':'#0a7fb5'}">${esc(teamName(team))}</span>
+  bar.innerHTML = `<div class="t">ลูกตก${({L:'ฝั่งซ้าย',R:'ฝั่งขวา',N:'ฝั่งใกล้กล้อง',F:'ฝั่งไกลกล้อง'})[side]} → +1 <span style="color:${team==='A'?'#b07d00':'#0a7fb5'}">${esc(teamName(team))}</span>
       <small>${C.auto ? 'ให้แต้มอัตโนมัติใน 2 วินาที' : 'ยืนยันแต้มนี้?'}</small></div>
     <button class="no" id="pNo">ไม่ใช่</button><button class="yes" id="pYes">ให้แต้ม</button>${C.auto?'<div class="bar" id="pBar"></div>':''}`;
   bar.classList.remove('hidden');
@@ -815,20 +820,40 @@ function drawOverlay(){
     octx.drawImage(maskCv, r.x, r.y, r.w, r.h);
   }
 
-  // floor zone shading
-  const fy = r.y + C.floorY*r.h, nx = r.x + C.netX*r.w;
-  octx.fillStyle = 'rgba(255,210,63,.08)'; octx.fillRect(r.x, fy, r.w, r.y + r.h - fy);
+  const fy = r.y + C.floorY*r.h, nx = r.x + C.netX*r.w, ny = r.y + C.netY*r.h;
   octx.lineWidth = C.calib ? 3 : 1.5;
   octx.setLineDash(C.calib ? [] : [8,6]);
-  octx.strokeStyle = C.calib ? '#ffd23f' : 'rgba(255,210,63,.6)';
-  octx.beginPath(); octx.moveTo(r.x, fy); octx.lineTo(r.x+r.w, fy); octx.stroke();
-  octx.strokeStyle = C.calib ? '#ff6b6b' : 'rgba(255,255,255,.55)';
-  octx.beginPath(); octx.moveTo(nx, r.y); octx.lineTo(nx, r.y+r.h); octx.stroke();
+  if(isEnd()){
+    // near half shading + horizontal net-base line
+    octx.fillStyle = 'rgba(255,255,255,.05)'; octx.fillRect(r.x, ny, r.w, r.y + r.h - ny);
+    octx.strokeStyle = C.calib ? '#ff6b6b' : 'rgba(255,255,255,.55)';
+    octx.beginPath(); octx.moveTo(r.x, ny); octx.lineTo(r.x+r.w, ny); octx.stroke();
+  } else {
+    octx.fillStyle = 'rgba(255,210,63,.08)'; octx.fillRect(r.x, fy, r.w, r.y + r.h - fy);
+    octx.strokeStyle = C.calib ? '#ffd23f' : 'rgba(255,210,63,.6)';
+    octx.beginPath(); octx.moveTo(r.x, fy); octx.lineTo(r.x+r.w, fy); octx.stroke();
+    octx.strokeStyle = C.calib ? '#ff6b6b' : 'rgba(255,255,255,.55)';
+    octx.beginPath(); octx.moveTo(nx, r.y); octx.lineTo(nx, r.y+r.h); octx.stroke();
+  }
   octx.setLineDash([]);
 
+  // which team is on which part of the image
+  octx.font = '600 13px Anuphan, sans-serif'; octx.textBaseline = 'middle';
+  const tag = (txt, x, y, align, color) => {
+    octx.textAlign = align; const w = octx.measureText(txt).width + 16;
+    const bx = align === 'center' ? x - w/2 : align === 'right' ? x - w : x;
+    octx.fillStyle = 'rgba(0,0,0,.55)'; octx.fillRect(bx, y - 12, w, 24);
+    octx.fillStyle = color; octx.fillText(txt, align === 'center' ? x : align === 'right' ? x - 8 : x + 8, y);
+  };
+  const tL = M.left, tR = other(M.left);
+  if(isEnd()){
+    tag('ไกล: ' + teamName(tR), r.x + r.w/2, Math.max(r.y + 16, ny - 22), 'center', tR==='A'?'#ffc21a':'#3ec5ff');
+    tag('ใกล้: ' + teamName(tL), r.x + r.w/2, Math.min(r.y + r.h - 16, ny + 22), 'center', tL==='A'?'#ffc21a':'#3ec5ff');
+  }
+
   if(C.calib){
-    handle(nx, r.y + r.h*0.18, '#ff6b6b', '⇆');
-    handle(r.x + r.w*0.82, fy, '#ffd23f', '⇅');
+    if(isEnd()) handle(r.x + r.w*0.82, ny, '#ff6b6b', '⇅');
+    else { handle(nx, r.y + r.h*0.18, '#ff6b6b', '⇆'); handle(r.x + r.w*0.82, fy, '#ffd23f', '⇅'); }
   }
 
   // live track
@@ -862,9 +887,25 @@ function handle(x, y, color, glyph){
 
 /* ---------- calibration (drag lines) ---------- */
 let dragging = null;
+const CAL_TEXT = {
+  side: `วางโทรศัพท์บนขาตั้ง<b>ข้างคอร์ต ตรงแนวเน็ต</b> ให้เห็นทั้งสองฝั่ง แล้วลาก<br>
+    • เส้น<b class="r">แดง</b> ให้ตรงกับ<b>เสาเน็ต</b> (แบ่งฝั่งซ้าย/ขวา)<br>
+    • เส้น<b class="y">เหลือง</b> ให้อยู่<b>ระดับพื้นคอร์ต</b> ขอบฝั่งไกลกล้อง (ใต้เส้นนี้ = พื้น)`,
+  end: `วางโทรศัพท์บนขาตั้ง<b>หลังเส้นหลัง กลางคอร์ต</b> ตั้งสูง 2 เมตรขึ้นไป ให้เห็นทั้งคอร์ต แล้วลาก<br>
+    • เส้น<b class="r">แดง</b> ให้ตรงกับ<b>โคนเสาเน็ตที่ติดพื้น</b> (ใต้เส้น = ฝั่งใกล้กล้อง, เหนือเส้น = ฝั่งไกล)<br>
+    • กด "สลับฝั่งทีม" ถ้าชื่อทีมใกล้/ไกลบนภาพไม่ตรงความจริง`
+};
+function syncCalibUI(){
+  $('#calView').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === C.view));
+  $('#calText').innerHTML = CAL_TEXT[C.view];
+}
+$('#calView').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  C.view = b.dataset.v; saveCam(); syncCalibUI();
+});
 function startCalib(){
   C.calib = true; hidePending(); document.body.classList.add('calib');
-  $('#calibBox').classList.remove('hidden'); setPill('idle');
+  syncCalibUI(); $('#calibBox').classList.remove('hidden'); setPill('idle');
 }
 function endCalib(){
   C.calib = false; C.hasCalib = true; saveCam();
@@ -872,19 +913,23 @@ function endCalib(){
   lastAward = Date.now(); toast('บันทึกตำแหน่งแล้ว');
 }
 $('#calDone').onclick = endCalib;
-$('#calFlip').onclick = () => { snapshot(); M.left = other(M.left); save(); render(); toast('สลับฝั่งทีมแล้ว — ฝั่งซ้ายของภาพคือ ' + teamName(M.left)); };
+$('#calFlip').onclick = () => { snapshot(); M.left = other(M.left); save(); render(); toast('สลับฝั่งทีมแล้ว — ฝั่ง' + (isEnd() ? 'ใกล้กล้อง' : 'ซ้ายของภาพ') + 'คือ ' + teamName(M.left)); };
 ovc.addEventListener('pointerdown', e => {
   if(!C.calib) return;
   const b = ovc.getBoundingClientRect(), r = vrect(), x = e.clientX - b.left, y = e.clientY - b.top;
-  const dNet = Math.abs(x - (r.x + C.netX*r.w)), dFloor = Math.abs(y - (r.y + C.floorY*r.h));
-  dragging = dNet < dFloor ? 'net' : 'floor';
+  if(isEnd()) dragging = 'netY';
+  else {
+    const dNet = Math.abs(x - (r.x + C.netX*r.w)), dFloor = Math.abs(y - (r.y + C.floorY*r.h));
+    dragging = dNet < dFloor ? 'net' : 'floor';
+  }
   ovc.setPointerCapture(e.pointerId); moveLine(e);
 });
 ovc.addEventListener('pointermove', e => { if(dragging) moveLine(e); });
 ovc.addEventListener('pointerup', () => { dragging = null; });
 function moveLine(e){
   const b = ovc.getBoundingClientRect(), r = vrect();
-  if(dragging === 'net') C.netX = Math.min(.95, Math.max(.05, (e.clientX - b.left - r.x) / r.w));
+  if(dragging === 'netY') C.netY = Math.min(.95, Math.max(.05, (e.clientY - b.top - r.y) / r.h));
+  else if(dragging === 'net') C.netX = Math.min(.95, Math.max(.05, (e.clientX - b.left - r.x) / r.w));
   else C.floorY = Math.min(.98, Math.max(.2, (e.clientY - b.top - r.y) / r.h));
 }
 
@@ -893,6 +938,7 @@ function camMenu(){
   openOv(`<div class="menu"><h3>โหมดกล้อง</h3>
     <div class="btns">
       <button id="cFace">สลับกล้อง <span>${C.facing==='environment'?'กล้องหลัง':'กล้องหน้า'} 🔄</span></button>
+      <button id="cView">มุมกล้อง <span>${isEnd() ? '🎯 หลังคอร์ต' : '📐 ข้างคอร์ต'}</span></button>
       <button id="cAuto">ให้แต้มอัตโนมัติ <span class="sw ${C.auto?'on':''}"></span></button>
       <button id="cSens">ความไวการจับลูก <span>${SENS[C.sens].label}</span></button>
       <button id="cCal">ตั้งเส้นเน็ต / พื้น <span>📐</span></button>
@@ -902,6 +948,7 @@ function camMenu(){
     </div>
     <p style="margin-top:12px;font-size:12.5px;text-align:left">ระบบดูว่าลูกตกพื้นฝั่งไหนแล้วให้แต้มอีกฝั่ง ยังแยกลูกออกหรือลูกเสียที่ไม่ตกพื้น (ติดเน็ต, ฟาล์ว) ไม่ได้ — แตะฝั่งที่ได้แต้มเองหรือกด "ไม่ใช่" ได้ตลอด</p></div>`);
   $('#cFace').onclick = async () => { closeOv(); await camSwitch(); };
+  $('#cView').onclick = () => { closeOv(); startCalib(); };
   $('#cAuto').onclick = () => { C.auto = !C.auto; saveCam(); camMenu(); };
   $('#cSens').onclick = () => { C.sens = (C.sens+1) % SENS.length; saveCam(); camMenu(); };
   $('#cCal').onclick = () => { closeOv(); startCalib(); };
